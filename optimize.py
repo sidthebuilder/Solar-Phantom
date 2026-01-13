@@ -138,8 +138,11 @@ def optimize_drone():
 
     # 9. Solve
     # --------
-    sol = opti.solve()
-
+    try:
+        sol = opti.solve(verbose=False)
+    except RuntimeError:
+        return None, time, None, max_battery_energy_Joule
+        
     # 10. Output Results
     # ------------------
     print("-" * 50)
@@ -157,10 +160,17 @@ def optimize_drone():
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     
-    try:
-        sol, t, E, E_max = optimize_drone()
+    sol, t, E, E_max = optimize_drone()
         
-        # Visualize the Mission
+    if sol is None:
+        print("\n" + "!" * 50)
+        print("PHYSICS LIMIT REACHED: Perpetual Flight Infeasible")
+        print("!" * 50)
+        print("Explanation: The drone cannot store enough energy to survive the night.")
+        print("Suggestion: Increase battery energy density or switch latitudes.")
+        sys.exit(0)
+
+    # Visualize the Mission
         plt.figure(figsize=(10, 6))
         
         # Convert J to kWh for readability
