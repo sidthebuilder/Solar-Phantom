@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import aerosandbox as asb
 import aerosandbox.numpy as np
 from aerosandbox.library import power_solar
@@ -10,10 +13,10 @@ def optimize_drone():
     # 2. Define Variables (The "Knobs")
     # ---------------------------------
     # We let the optimizer choose the best values for these:
-    wingspan = opti.variable(init_guess=30, lower_bound=10, upper_bound=50) # meters
+    wingspan = opti.variable(init_guess=30, lower_bound=10, upper_bound=80) # meters
     aspect_ratio = opti.variable(init_guess=20, lower_bound=10, upper_bound=40) # Slender wings
-    total_weight = opti.variable(init_guess=100, lower_bound=10, upper_bound=500) # kg
-    battery_mass = opti.variable(init_guess=30, lower_bound=5, upper_bound=200) # kg
+    total_weight = opti.variable(init_guess=100, lower_bound=10, upper_bound=600) # kg
+    battery_mass = opti.variable(init_guess=30, lower_bound=5, upper_bound=300) # kg
     
     # Flight variable: Cruise speed
     velocity = opti.variable(init_guess=20, lower_bound=10, upper_bound=50) # m/s (approx 72 km/h)
@@ -105,7 +108,9 @@ def optimize_drone():
     battery_capacity_Wh_kg = 350 # High-end Li-Ion pack density
     max_battery_energy_Joule = battery_mass * battery_capacity_Wh_kg * 3600
     
-    energy_stored = opti.variable(init_guess=max_battery_energy_Joule/2, n_vars=N)
+    # Initial guess for battery energy (assuming ~50kg battery initially)
+    init_energy_guess = 50 * 350 * 3600 / 2 
+    energy_stored = opti.variable(init_guess=init_energy_guess, n_vars=N)
     
     # Constraint: Battery State-of-Charge Dynamics
     dt = 86400 / (N - 1)
