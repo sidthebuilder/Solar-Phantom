@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+design_specs.json
+simulation_report.md
+.DS_Store

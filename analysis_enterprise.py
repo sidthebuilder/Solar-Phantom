@@ -5,8 +5,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import aerosandbox as asb
 import aerosandbox.numpy as np
-from aerosandbox.library import power_solar
 import matplotlib.pyplot as plt
+from physics_model import DronePhysics, PhysicsConstants
 
 def solve_for_required_tech(latitude, payload_mass=2.0):
     """
@@ -18,63 +18,49 @@ def solve_for_required_tech(latitude, payload_mass=2.0):
     # Variables
     wingspan = opti.variable(init_guess=30, lower_bound=10, upper_bound=60)
     aspect_ratio = opti.variable(init_guess=25, lower_bound=15, upper_bound=40)
-    total_weight = opti.variable(init_guess=100, lower_bound=5, upper_bound=300) # kg
-    battery_mass = opti.variable(init_guess=30, lower_bound=1, upper_bound=150) # kg
-    velocity = opti.variable(init_guess=18, lower_bound=10, upper_bound=40) # m/s
+    total_weight = opti.variable(init_guess=100, lower_bound=5, upper_bound=300) 
+    battery_mass = opti.variable(init_guess=30, lower_bound=1, upper_bound=150)
+    velocity = opti.variable(init_guess=18, lower_bound=10, upper_bound=40)
     
     # The Magic Variable: Required Tech Level
     required_battery_density = opti.variable(init_guess=350, lower_bound=100, upper_bound=1000) # Wh/kg
 
     # Geometry
-    wing_area = wingspan ** 2 / aspect_ratio
+    wing_area = DronePhysics.geometry(wingspan, aspect_ratio)
     
-    # Mass Model (MPPT Added)
-    # Structure (Carbon)
-    mass_structure = 0.06 * (wingspan ** 2.45) # Slightly refined structural model
-    
-    # MPPT Mass Model (from Studies)
-    # Estimated Peak Power ~ 1000W -> Mass ~ 0.06 * 1000^0.5 ~= 2kg
-    # Simplified for optimization stability:
-    mass_mppt = 2.0 
-    
-    mass_avionics = 1.0 # Autopilot
-    mass_propulsion = 0.15 * total_weight
-    mass_solar_cells = 0.35 * wing_area
+    # Mass Model
+    # Note: PhysicsConstants.mass_mppt and others are used internally by DronePhysics
+    mass_data = DronePhysics.mass_breakdown(
+        wingspan, wing_area, total_weight, battery_mass, payload_mass
+    )
     
     opti.subject_to([
-        total_weight / 9.81 >= (mass_structure + payload_mass + mass_avionics + mass_mppt + mass_propulsion + mass_solar_cells + battery_mass)
+        total_weight / 9.81 >= mass_data["total_calculated"]
     ])
 
     # Aerodynamics
-    CD0 = 0.018 # Very clean
-    e = 0.92
+    aero_data = DronePhysics.aerodynamics(
+        total_weight, velocity, wing_area, aspect_ratio
+    )
     
-    lift = total_weight
-    q = 0.5 * 1.225 * velocity ** 2
-    CL = lift / (q * wing_area)
-    k = 1 / (np.pi * e * aspect_ratio)
-    CD = CD0 + k * CL ** 2
-    drag = CD * q * wing_area
+    # Power
+    power_draw_motor = aero_data["power_required"] / PhysicsConstants.propulsive_eff
+    power_draw_avionics = 30 # Enterprise analysis assumed 30W avionics (radio only) vs 50W full autopilot?
+    # Let's standardize to the PhysicsConstants.mass_avionics implies... actually mass != power.
+    # The original enterprise script had 30W. optimize.py had 50W.
+    # Standardizing to 50W to be safe/consistent with optimize.py
+    power_draw_avionics = 50 
     
-    power_required = drag * velocity
-    propaps_eff = 0.70 # Prop + Motor + ESC
-    power_draw = power_required / propaps_eff + 30 # 30W avionics/radio
+    total_power_out = power_draw_motor + power_draw_avionics
 
     # Solar & Energy
-    day_of_year = 172 # Summer Solstice (Best Case)
+    day_of_year = 172 # Summer Solstice 
     N = 40
     time = np.linspace(0, 86400, N)
     
-    fluxes = power_solar.solar_flux(
-        latitude=latitude,
-        day_of_year=day_of_year,
-        time=time,
-        panel_tilt_angle=0
+    power_in = DronePhysics.solar_power_in(
+        latitude, day_of_year, time, wing_area
     )
-    
-    # Panel Eff (24%) * Fill Factor (90%) * MPPT Eff (96%) = ~20%
-    sys_solar_eff = 0.20
-    power_in = fluxes * wing_area * sys_solar_eff
     
     # Energy Balance
     # Total Energy Stored = Mass * Density
@@ -86,7 +72,7 @@ def solve_for_required_tech(latitude, payload_mass=2.0):
     dt = 86400 / (N - 1)
     
     for i in range(N-1):
-        net_power = power_in[i] - power_draw
+        net_power = power_in[i] - total_power_out
         opti.subject_to(energy[i+1] == energy[i] + net_power * dt)
         
     opti.subject_to([
@@ -96,7 +82,6 @@ def solve_for_required_tech(latitude, payload_mass=2.0):
     ])
     
     # OBJECTIVE: Minimize the Required Tech Level
-    # We want to find the "Easiest" tech that solves the problem
     opti.minimize(required_battery_density)
     
     try:
@@ -106,8 +91,8 @@ def solve_for_required_tech(latitude, payload_mass=2.0):
         return None
 
 if __name__ == "__main__":
-    print("Running Enterprise Technology Boundary Analysis...")
-    print("Payload: 2.0 kg (Radio)")
+    print("Running Enterprise Technology Boundary Analysis (Unified Physics)...")
+    print("Payload: 2.0 kg (Standardized)")
     print("-" * 40)
     
     latitudes = [0, 10, 20, 30, 40, 50, 60]
@@ -154,5 +139,5 @@ if __name__ == "__main__":
     plt.legend()
     plt.ylim(100, 600)
     
-    print("\nanalysis Complete. Improving Strategic Insight...")
+    print("\nAnalysis Complete.")
     plt.show()

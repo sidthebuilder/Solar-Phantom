@@ -1,5 +1,12 @@
 # Solar Phantom: Perpetual Flight Initiative
 
+> **What does this project do?**
+>
+> In simple terms, this tool designs a **Solar Drone that flies forever**.
+> 1.  You tell it where you want to fly (e.g., "India") and what you want to carry (e.g., "A camera").
+> 2.  It uses physics to calculate exactly **how big the wings need to be** and **how many batteries** rely on to survive the night.
+> 3.  It proves mathematically if "perpetual flight" is possible or impossible for your mission.
+
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Status: In Development](https://img.shields.io/badge/Status-Building-orange.svg)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-green)
